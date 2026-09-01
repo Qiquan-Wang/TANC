@@ -1,0 +1,31 @@
+# ── Python ───────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+
+# ── Build / packaging output ─────────────────────────────────────────────
+build/
+dist/
+*.whl
+
+# ── OS / editor metadata ─────────────────────────────────────────────────
+.DS_Store
+.ipynb_checkpoints/
+
+# ── Local test suite ─────────────────────────────────────────────────────
+# Kept on this machine as evidence; a broader suite precedes public release.
+test/
+
+# ── Sphinx build output ──────────────────────────────────────────────────
+# The whole build is generated: CI rebuilds it on push and publishes to GitHub
+# Pages, and `make html` reproduces it locally.  Nothing under _build/ belongs
+# in the repo.
+docs/_build/
+docs/_generated/
+
+# ── Generated run output and caches ──────────────────────────────────────
+mapper_study_runs*/
+tutorial_cache/
+tutorial_outputs/
