@@ -1,0 +1,80 @@
+# =============================================================================
+# tanc — minimal runtime requirements
+# Cross-platform: works as-is on Windows, macOS (Intel + Apple Silicon), Linux.
+# pip selects the correct per-platform wheel from the same name+version, so a
+# single file covers all three OSes for a CPU install.  GPU notes at the bottom.
+#
+#   python -m pip install -r requirements.txt
+#
+# Tested with Python 3.11.  (3.9-3.12 should all resolve.)
+# =============================================================================
+
+# --- Scientific core (always required) ---------------------------------------
+numpy==1.26.4
+scipy==1.17.1
+pandas==3.0.2
+scikit-learn==1.3.2
+matplotlib==3.10.8
+networkx==3.6.1
+
+# --- Topological data analysis (always required) -----------------------------
+giotto-tda==0.6.2      # gtda — persistence + Mapper backend
+gudhi==3.12.0
+ripser==0.6.14
+persim==0.3.8
+POT==0.9.6.post1       # imported as `ot` (Wasserstein distances in Mapper)
+
+# --- ML backends -------------------------------------------------------------
+# torch and tensorflow are ALTERNATIVE backends, both lazily imported.
+# You only strictly need the one that matches the models you analyse.
+# Listed together here so a fresh install handles either kind of model.
+torch==2.2.2
+torchvision==0.17.2
+tensorflow==2.16.2
+keras==3.14.0
+
+# --- Jupyter / notebook (required — the toolkit is driven from notebooks) -----
+jupyterlab==4.5.6      # the notebook IDE (pulls in notebook, jupyter-server, nbformat…)
+ipykernel==7.2.0       # the Python kernel Jupyter runs your code in
+ipywidgets==8.1.8      # interactive widgets used by the tools' UIs/progress bars
+
+# =============================================================================
+# OPTIONAL — uncomment if you run the bundled example / paper-reproduction
+# scripts. (Not imported by the tanc library itself.)
+# -----------------------------------------------------------------------------
+# seaborn==0.13.2
+# plotly==6.6.0
+# hdbscan==0.8.40
+# umap-learn          # provides `umap`
+# kmapper==2.1.0
+# scikit-tda==1.1.1
+# tadasets==0.2.2
+# teaspoon==1.5.29
+# tqdm==4.67.3        # (also pulled in transitively)
+# torchaudio==2.2.2   # only if you load audio models
+
+# =============================================================================
+# GPU NOTES (the package NAMES above are identical on every OS) ----------------
+#
+# PyTorch:
+#   * Apple Silicon (M1-M4): the standard `torch` wheel ABOVE already contains
+#     the MPS/Metal backend. NOTHING extra to install, SAME version. Use it via
+#     `tensor.to("mps")` / `device="mps"`.
+#   * NVIDIA GPU (Windows/Linux): replace the torch lines with the CUDA build,
+#     e.g.  pip install torch==2.2.2 torchvision==0.17.2 \
+#             --index-url https://download.pytorch.org/whl/cu121
+#     (Mac never uses CUDA.)
+#
+# TensorFlow:
+#   * Apple Silicon GPU: see requirements-mac-gpu.txt (adds tensorflow-metal).
+#   * Windows: TF > 2.10 has NO native GPU support — CPU only unless you run
+#     under WSL2 with CUDA. The wheel above runs fine on CPU.
+#   * Linux + NVIDIA: `tensorflow==2.16.2` includes CUDA support out of the box
+#     (given a working CUDA/cuDNN driver stack).
+# =============================================================================
+
+# Docs build (Sphinx + MyST for .md includes); heavy deps are mocked in conf.py.
+# myst-nb (which depends on myst-parser) renders the paper_reproduce notebooks
+# from their stored outputs — no pandoc needed, build never executes them.
+sphinx
+myst-nb

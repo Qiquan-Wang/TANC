@@ -1,0 +1,29 @@
+# =============================================================================
+# tanc — Apple Silicon (M-series) GPU overlay
+# Use ONLY on macOS with an Apple Silicon chip (arm64).  Do NOT use on Intel
+# Mac, Windows, or Linux.
+#
+#   python -m pip install -r requirements.txt        # core (same file as everyone)
+#   python -m pip install -r requirements-mac-gpu.txt # then this overlay
+#
+# What this changes vs. the core file:
+#   * PyTorch  -> NO change. The torch==2.2.2 wheel in requirements.txt already
+#                 ships the MPS (Metal) backend on Apple Silicon. Just select
+#                 device="mps". Same package, same version.
+#   * TensorFlow -> add the `tensorflow-metal` plugin so Keras/TF ops run on the
+#                 Apple GPU. Its version MUST match the TensorFlow minor series:
+#                 tensorflow 2.16.x  <->  tensorflow-metal 1.2.0
+# =============================================================================
+
+tensorflow-metal==1.2.0   # Metal (Apple GPU) execution plugin for TF 2.16.x
+
+# Notes:
+#   * Verify Metal is picked up:
+#       python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
+#     -> should list a 'GPU' device.
+#   * tensorflow-metal occasionally changes numerics on some ops; if you hit odd
+#     results, `pip uninstall tensorflow-metal` falls back to CPU with no other
+#     changes.
+#   * No extra package is needed for PyTorch MPS — it is built into the standard
+#     wheel. (Optionally set PYTORCH_ENABLE_MPS_FALLBACK=1 so any unimplemented
+#     op falls back to CPU instead of erroring.)

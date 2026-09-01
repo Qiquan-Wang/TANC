@@ -1,0 +1,47 @@
+# Complete conda environment for tanc (analysis + web builder).
+#   conda env create -f docs/environment.yml
+#   conda activate tanc
+#
+# Mirrors docs/requirements.txt. The TDA persistence/Mapper backends
+# (giotto-tda, ripser, persim) and TensorFlow live in the pip: block because
+# they are distributed on PyPI, not conda-forge.
+name: tanc
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  # --- scientific core ---
+  - numpy
+  - scipy
+  - pandas
+  - scikit-learn
+  - matplotlib
+  - networkx
+  - joblib
+  - tqdm
+  # --- TDA (available on conda-forge) ---
+  - gudhi
+  - pot                # imported as `ot`
+  # --- PyTorch backend (CPU) ---
+  - pytorch
+  - torchvision
+  - torchaudio
+  - cpuonly
+  # --- notebook / widgets ---
+  - jupyterlab
+  - ipykernel
+  - ipywidgets
+  # --- optional extras used by some examples ---
+  - hdbscan
+  - umap-learn
+  - seaborn
+  - plotly
+  - pip:
+      # TDA backends distributed only on PyPI — REQUIRED for PH / Mapper
+      - giotto-tda==0.6.2      # gtda — Mapper + persistence backend
+      - ripser==0.6.14         # default PH engine
+      - persim==0.3.8          # persistence images / diagrams
+      # TensorFlow backend (alternative to PyTorch; both are supported)
+      - tensorflow==2.16.2
+      - keras==3.14.0
