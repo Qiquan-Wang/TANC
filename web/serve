@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Launch the TANC Visual Builder with the project's virtual-env Python
+# (so torch / tensorflow / giotto-tda / tanc are all available).
+#
+#   ./web/serve            # from the repo root
+#   web/serve              # same
+#
+# Falls back to whatever `python3` is on PATH if no .venv is found.
+set -e
+HERE="$(cd "$(dirname "$0")" && pwd)"      # …/tanc/web
+REPO="$(dirname "$HERE")"                  # …/tanc
+
+PY=""
+for cand in "$REPO/.venv" "$REPO/../.venv" "$REPO/../../.venv" "$VIRTUAL_ENV" "$CONDA_PREFIX"; do
+  if [ -n "$cand" ] && [ -x "$cand/bin/python3" ]; then PY="$cand/bin/python3"; break; fi
+  if [ -n "$cand" ] && [ -x "$cand/bin/python" ];  then PY="$cand/bin/python";  break; fi
+done
+PY="${PY:-python3}"
+
+echo "launching with: $PY"
+exec "$PY" "$HERE/server.py"

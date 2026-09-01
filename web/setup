@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# One-time setup for anyone using the TANC Visual Builder.
+# Creates a virtual-env at <repo>/.venv with every dependency, then you launch
+# with ./web/serve.
+#
+#   ./web/setup            # create .venv and install requirements
+#   PYTHON=python3.11 ./web/setup   # pick the base interpreter
+set -e
+HERE="$(cd "$(dirname "$0")" && pwd)"      # …/tanc/web
+REPO="$(dirname "$HERE")"                  # …/tanc
+VENV="$REPO/.venv"
+PYBASE="${PYTHON:-python3}"
+
+echo "creating virtual-env at $VENV  (base: $PYBASE)"
+"$PYBASE" -m venv "$VENV"
+"$VENV/bin/python" -m pip install --upgrade pip wheel
+echo "installing tanc + all dependencies from pyproject.toml (this can take a few minutes)…"
+"$VENV/bin/python" -m pip install -e "$REPO"
+
+echo
+echo "✓ done.  Launch the builder with:   ./web/serve"
+echo "  then open http://localhost:8000"

@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TANC — Visual Builder</title>
+  <link rel="stylesheet" href="styles.css?v=1787605029" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◵</span>
+      <div>
+        <h1>TANC <span class="muted">Visual Builder</span></h1>
+        <p class="sub">Assemble a network, choose data &amp; a topological analysis, then generate runnable Python.</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button id="theme-toggle" class="ghost" title="Toggle light/dark">◐</button>
+      <button id="load-example" class="ghost">Load example</button>
+      <button id="reset-all" class="ghost danger">Reset</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- ============ CONFIG COLUMN ============ -->
+    <section class="config">
+
+      <!-- 1. MODEL -->
+      <article class="card" id="card-model">
+        <div class="card-head">
+          <h2><span class="step">1</span> Model</h2>
+          <div class="segmented sm" id="framework">
+            <button data-fw="torch" class="active">PyTorch</button>
+            <button data-fw="tf">TensorFlow</button>
+          </div>
+          <p class="hint" id="shape-hint"></p>
+        </div>
+        <div class="palette" id="palette"><!-- layer buttons injected --></div>
+        <ol class="stack" id="layer-stack"><!-- layer cards injected --></ol>
+        <p class="empty" id="stack-empty">No layers yet — click a layer above to add it.</p>
+      </article>
+
+      <!-- 2. DATA -->
+      <article class="card" id="card-data">
+        <div class="card-head"><h2><span class="step">2</span> Data</h2></div>
+        <div class="grid2">
+          <label>Dataset
+            <select id="dataset">
+              <optgroup label="Built-in (torchvision, auto-download)">
+                <option value="MNIST">MNIST — 1×28×28, 10 classes</option>
+                <option value="FashionMNIST">FashionMNIST — 1×28×28, 10 classes</option>
+                <option value="KMNIST">KMNIST — 1×28×28, 10 classes</option>
+                <option value="CIFAR10">CIFAR-10 — 3×32×32, 10 classes</option>
+                <option value="CIFAR100">CIFAR-100 — 3×32×32, 100 classes</option>
+              </optgroup>
+              <option value="custom">Custom (name / URL)…</option>
+            </select>
+          </label>
+          <label>Batch size <input id="batch" type="number" min="1" value="128" /></label>
+          <label>Train samples <input id="train-n" type="number" min="1" value="2000" /></label>
+          <label>Test samples <input id="test-n" type="number" min="1" value="500" /></label>
+        </div>
+        <div id="custom-data" class="custom-data hidden">
+          <label>Dataset name or download URL
+            <input id="custom-data-src" type="text" placeholder="e.g. https://…/dataset.npz  or  my_dataset" />
+          </label>
+          <p class="hint">A loader stub is emitted — fill in how to read your data into <code>X_tr, y_tr, X_te, y_te</code> tensors.</p>
+        </div>
+      </article>
+
+      <!-- 3. TRAINING -->
+      <article class="card" id="card-training">
+        <div class="card-head"><h2><span class="step">3</span> Training</h2></div>
+        <div class="grid2">
+          <label>Epochs <input id="epochs" type="number" min="1" value="10" /></label>
+          <label>Model instances
+            <input id="instances" type="number" min="1" value="1" title="Train N copies with different seeds and pool them (e.g. conv-kernel Mapper)" />
+          </label>
+          <label>Optimizer
+            <select id="optimizer">
+              <option value="Adam">Adam</option>
+              <option value="SGD">SGD</option>
+              <option value="AdamW">AdamW</option>
+            </select>
+          </label>
+          <label>Learning rate <input id="lr" type="text" value="1e-3" /></label>
+          <label>Device
+            <select id="device">
+              <option value="auto">auto (cuda→mps→cpu)</option>
+              <option value="cpu">cpu</option>
+              <option value="cuda">cuda</option>
+              <option value="mps">mps</option>
+            </select>
+          </label>
+          <label id="snapshot-wrap" title="Trajectory analyses only: capture a snapshot every epoch, or every N mini-batches (iterations). The PH-dimension methods (Birdal 2021, Dupuis 2023) study the trajectory over batches — thousands of points — so 'per batch' gives a far more stable fractal dimension.">Snapshot every
+            <span style="display:flex; gap:4px">
+              <input id="snapshot-every" type="number" min="1" value="1" style="width:5em" />
+              <select id="snapshot-sched">
+                <option value="epoch">epoch(s)</option>
+                <option value="iteration">batch(es)</option>
+              </select>
+            </span>
+          </label>
+        </div>
+      </article>
+
+      <!-- 4. RECORDING -->
+      <article class="card" id="card-recording">
+        <div class="card-head">
+          <h2><span class="step">4</span> Record</h2>
+          <p class="hint">Which layers to capture, and what.</p>
+        </div>
+        <div class="grid2">
+          <label>Layers to record
+            <select id="record-mode">
+              <option value="preset">Preset group…</option>
+              <option value="explicit">Pick specific layers…</option>
+            </select>
+          </label>
+          <label id="record-preset-wrap">Group
+            <select id="record-preset">
+              <option value="all_linear">all_linear</option>
+              <option value="all_conv">all_conv</option>
+              <option value="soro">soro</option>
+              <option value="all_attention">all_attention</option>
+              <option value="all_embedding">all_embedding</option>
+              <option value="linear_and_conv">linear_and_conv</option>
+              <option value="all">all</option>
+            </select>
+          </label>
+        </div>
+        <div id="record-explicit" class="chips hidden"><!-- layer checkboxes --></div>
+        <fieldset class="aspects">
+          <legend>Aspects</legend>
+          <label class="chk"><input type="checkbox" id="asp-weights" checked /> weights</label>
+          <label class="chk"><input type="checkbox" id="asp-activations" /> activations</label>
+        </fieldset>
+        <label id="pooling-wrap" class="hidden">Activation pooling (transformer <code>(batch, seq, hidden)</code>)
+          <select id="activation-pooling">
+            <option value="flatten">flatten (default)</option>
+            <option value="last">last token</option>
+            <option value="mean">mean over tokens</option>
+            <option value="first">first token (≈CLS)</option>
+            <option value="max">max over tokens</option>
+          </select>
+        </label>
+      </article>
+
+      <!-- 5. ANALYSIS -->
+      <article class="card" id="card-analysis">
+        <div class="card-head"><h2><span class="step">5</span> Analysis</h2></div>
+        <div class="segmented" id="analysis-mode">
+          <button data-mode="preset" class="active">Paper preset</button>
+          <button data-mode="custom">Custom pipeline</button>
+          <button data-mode="overtraining">Over training</button>
+          <button data-mode="sweep">Mapper sweep</button>
+        </div>
+
+        <!-- preset -->
+        <div id="analysis-preset">
+          <label>Preset
+            <select id="preset"></select>
+          </label>
+          <p class="preset-desc" id="preset-desc"></p>
+        </div>
+
+        <!-- custom -->
+        <div id="analysis-custom" class="hidden">
+          <div class="grid2">
+            <label>Space / builder
+              <select id="builder">
+                <option value="weight_graph">weight_graph (weights)</option>
+                <option value="point_cloud_graph">point_cloud_graph (weight rows / cols)</option>
+                <option value="activation_graph">activation_graph (activations)</option>
+                <option value="kernel_graph">kernel_graph (conv spatial filters)</option>
+                <option value="labelled_complex_graph">labelled_complex_graph (decision boundary)</option>
+                <option value="polyhedral_graph">polyhedral_graph (ReLU activation regions)</option>
+                <option value="None">None (direct dimension)</option>
+              </select>
+            </label>
+            <label>Method / tool
+              <select id="tool">
+                <option value="ph">ph — persistent homology</option>
+                <option value="mapper">mapper</option>
+                <option value="dimension">dimension</option>
+              </select>
+            </label>
+          </div>
+          <div id="tool-kwargs" class="kwargs"><!-- dynamic --></div>
+          <div id="builder-kwargs" class="kwargs"><!-- dynamic --></div>
+          <div class="grid2">
+            <label>Representation
+              <select id="representation">
+                <option value="weights">weights</option>
+                <option value="activations">activations</option>
+                <option value="coupled">coupled (weight, activation)</option>
+                <option value="inputs_labels">inputs + predicted labels</option>
+                <option value="__kernels__">conv kernels of a layer…</option>
+                <option value="__layer__">a specific recorded layer…</option>
+              </select>
+            </label>
+            <label id="rep-layer-wrap" class="hidden">Layer
+              <select id="rep-layer"></select>
+            </label>
+            <label>Plot
+              <select id="plot-kind"></select>
+            </label>
+          </div>
+        </div>
+
+        <!-- over training -->
+        <div id="analysis-overtraining" class="hidden">
+          <label>Track over epochs
+            <select id="overtrain-track"></select>
+          </label>
+          <div id="overtrain-fields" class="kwargs"></div>
+          <p class="hint">Trains while capturing a snapshot every epoch, recomputes persistent homology at each one, and plots the chosen quantity against epoch.</p>
+        </div>
+
+        <!-- mapper sweep -->
+        <div id="analysis-sweep" class="hidden">
+          <p class="hint">Trains a population of networks, then runs Mapper across a grid of
+          cover and clustering parameters. Every graph is reported alongside the
+          <em>nerve of its own cover</em>, so <code>b1_excess</code> separates a real
+          finding from an artefact of the cover.</p>
+
+          <label>Layer(s) to analyse — from the model you built above</label>
+          <div id="sweep-layers" class="chips"></div>
+          <p class="hint">Each layer × view pair becomes its own point cloud, so the grid
+          grows multiplicatively.</p>
+
+          <label>View(s) — what counts as <strong>one point</strong></label>
+          <div id="sweep-views" class="chips">
+            <label class="chk"><input type="checkbox" data-v="full" checked> full <span class="ltype">whole matrix, one point</span></label>
+            <label class="chk"><input type="checkbox" data-v="rows"> rows</label>
+            <label class="chk"><input type="checkbox" data-v="cols"> cols</label>
+            <label class="chk"><input type="checkbox" data-v="row_norm"> row_norm</label>
+            <label class="chk"><input type="checkbox" data-v="col_norm"> col_norm</label>
+            <label class="chk"><input type="checkbox" data-v="row_sum"> row_sum</label>
+            <label class="chk"><input type="checkbox" data-v="col_sum"> col_sum</label>
+            <label class="chk"><input type="checkbox" data-v="gram_rows"> gram_rows</label>
+            <label class="chk"><input type="checkbox" data-v="gram_cols"> gram_cols</label>
+            <label class="chk"><input type="checkbox" data-v="gram_diag"> gram_diag <span class="ltype">lag profile</span></label>
+          </div>
+          <p class="hint">On a <strong>2-D</strong> weight — a linear layer, an embedding table,
+          an attention projection — these read the matrix directly.</p>
+
+          <label>Convolutional views — for a <code>(out, in, h, w)</code> weight</label>
+          <div id="sweep-conv-views" class="chips">
+            <label class="chk"><input type="checkbox" data-v="rows"> rows <span class="ltype">one kernel row</span></label>
+            <label class="chk"><input type="checkbox" data-v="cols"> cols <span class="ltype">one kernel column</span></label>
+            <label class="chk"><input type="checkbox" data-v="kernel"> kernel <span class="ltype">one whole kernel</span></label>
+            <label class="chk"><input type="checkbox" data-v="out_channel"> out_channel</label>
+            <label class="chk"><input type="checkbox" data-v="in_channel"> in_channel</label>
+            <label class="chk"><input type="checkbox" data-v="tap"> tap <span class="ltype">one spatial position</span></label>
+          </div>
+          <p class="hint">A convolutional weight has four axes, so &ldquo;row&rdquo; names no
+          particular one. Each view here says <strong>which axes index points</strong>; the rest
+          become that point&rsquo;s coordinates. <code>rows</code> and <code>cols</code> are the rows
+          and columns <em>of the kernel itself</em>. A Conv1d kernel has <code>h = 1</code>, so
+          <code>cols</code> there is refused rather than returning points of dimension 1.</p>
+
+          <label>Lens(es) — what the cover is built on</label>
+          <div id="sweep-lenses" class="chips">
+            <label class="chk"><input type="checkbox" data-v="pca1"> pca1 <span class="ltype">1-D: nerve has no loops</span></label>
+            <label class="chk"><input type="checkbox" data-v="pca2" checked> pca2</label>
+            <label class="chk"><input type="checkbox" data-v="l2"> l2 <span class="ltype">norm</span></label>
+            <label class="chk"><input type="checkbox" data-v="density"> density <span class="ltype">codensity</span></label>
+            <label class="chk"><input type="checkbox" data-v="tsne2"> tsne2 <span class="ltype">slow</span></label>
+            <label class="chk"><input type="checkbox" data-v="umap2"> umap2 <span class="ltype">needs umap-learn</span></label>
+          </div>
+          <p class="hint">A 1-D lens gives an interval-chain cover whose nerve has
+          <code>b1 = 0</code>, so there <code>b1_excess = b1</code> exactly — do not compare
+          <code>b1_excess</code> across lenses of different dimension.</p>
+
+          <div class="grid2">
+            <div>
+              <label>Rescaling — <strong>changes coordinates</strong> without removing points</label>
+              <div id="sweep-preps" class="chips">
+                <label class="chk"><input type="checkbox" data-v="none" checked> none</label>
+                <label class="chk"><input type="checkbox" data-v="l2"> l2 normalise <span class="ltype">onto the unit sphere</span></label>
+                <label class="chk"><input type="checkbox" data-v="mean_centre"> mean centre</label>
+                <label class="chk"><input type="checkbox" data-v="standardise"> standardise</label>
+              </div>
+              <p class="hint">Applied before the lens, because it changes the distances the
+              clusterer sees. <code>preprocess=</code> in the toolkit.</p>
+              <p class="hint"><strong>l2 normalise</strong> puts every point on the unit sphere, so
+              the clusterer sees direction rather than magnitude — use it when the structure you are
+              after is in the <em>shape</em> of a point and not its <em>size</em>. One caveat: points
+              with zero norm cannot be placed on the sphere and stay at the origin, where they are
+              coincident with each other and will bind into a single node.</p>
+            </div>
+            <div>
+              <label>Filtering — <strong>removes points</strong> without changing coordinates
+                <select id="sweep-filter">
+                  <option value="none">none</option>
+                  <option value="density">by density — keep the densest fraction</option>
+                  <option value="norm_high">by norm — keep the strongest</option>
+                  <option value="norm_low">by norm — keep the weakest</option>
+                </select>
+              </label>
+              <label id="sweep-filter-strength-wrap" class="hidden">Keep fraction(s) / percentile(s)
+                <input id="sweep-filter-strength" type="text" value="1.0, 0.5, 0.3">
+              </label>
+              <p class="hint" id="sweep-filter-hint"></p>
+              <p class="hint">Applied <em>after</em> the lens, with the cover pinned to the
+              unfiltered lens range — otherwise removing points shrinks the cover with them
+              and the comparison measures nothing. <code>point_filter=</code> in the toolkit.</p>
+            </div>
+          </div>
+
+          <label>Intervals (resolution) — <strong>integers only</strong></label>
+          <div id="sweep-intervals-box" class="chips">
+            <label class="chk"><input type="checkbox" data-v="8"> 8</label>
+            <label class="chk"><input type="checkbox" data-v="10" checked> 10</label>
+            <label class="chk"><input type="checkbox" data-v="12"> 12</label>
+            <label class="chk"><input type="checkbox" data-v="16"> 16</label>
+            <label class="chk"><input type="checkbox" data-v="20" checked> 20</label>
+            <label class="chk"><input type="checkbox" data-v="24"> 24</label>
+            <label class="chk"><input type="checkbox" data-v="30" checked> 30</label>
+            <label class="chk"><input type="checkbox" data-v="40"> 40</label>
+            <label class="chk"><input type="checkbox" data-v="50"> 50</label>
+            <label class="chk">other: <input id="sweep-intervals-other" type="text" size="12" placeholder="e.g. 14, 36"></label>
+          </div>
+
+          <label>Overlap — standard convention, must satisfy <strong>0 ≤ o &lt; 1</strong></label>
+          <div id="sweep-overlap-box" class="chips">
+            <label class="chk"><input type="checkbox" data-v="0.2"> 0.2</label>
+            <label class="chk"><input type="checkbox" data-v="0.3" checked> 0.3</label>
+            <label class="chk"><input type="checkbox" data-v="0.4"> 0.4</label>
+            <label class="chk"><input type="checkbox" data-v="0.5" checked> 0.5</label>
+            <label class="chk"><input type="checkbox" data-v="0.6"> 0.6</label>
+            <label class="chk"><input type="checkbox" data-v="0.67"> 0.67</label>
+            <label class="chk">other: <input id="sweep-overlap-other" type="text" size="12" placeholder="e.g. 0.45"></label>
+          </div>
+          <p class="hint">Overlap is |I ∩ I&#39;| / |I| — the fraction of a cover interval shared
+          with its neighbour. Interval width diverges as it approaches 1, so 1 is excluded.</p>
+
+          <div class="grid2">
+            <label>Clusterer
+              <select id="sweep-clusterer">
+                <optgroup label="Automatic — no threshold to choose">
+                  <option value="first_gap">first-gap linkage</option>
+                  <option value="hdbscan">HDBSCAN — density, no radius</option>
+                  <option value="dbscan_elbow">DBSCAN, eps at the k-NN elbow</option>
+                </optgroup>
+                <optgroup label="Swept over distance quantiles">
+                <option value="dbscan_q">DBSCAN, eps at distance quantiles</option>
+                <option value="single">single linkage</option>
+                <option value="ward">Ward linkage</option>
+                </optgroup>
+              </select>
+            </label>
+            <div>
+              <label id="sweep-linkage-wrap" class="hidden">Linkage for the gap rule
+                <select id="sweep-linkage">
+                  <option value="single">single — recovered a test loop</option>
+                  <option value="complete">complete — recovered a test loop</option>
+                  <option value="average">average — found the component, lost the loop</option>
+                  <option value="ward">ward — found the component, lost the loop</option>
+                </select>
+              </label>
+              <label id="sweep-mcs-wrap" class="hidden">Minimum cluster size
+                <input id="sweep-mcs" type="number" min="2" value="5">
+              </label>
+              <label>Distance quantiles (%)</label>
+              <div id="sweep-quantiles-box" class="chips">
+                <label class="chk"><input type="checkbox" data-v="0.5"> 0.5</label>
+                <label class="chk"><input type="checkbox" data-v="1" checked> 1</label>
+                <label class="chk"><input type="checkbox" data-v="2" checked> 2</label>
+                <label class="chk"><input type="checkbox" data-v="5" checked> 5</label>
+                <label class="chk"><input type="checkbox" data-v="10"> 10</label>
+                <label class="chk"><input type="checkbox" data-v="25"> 25</label>
+                <label class="chk">other: <input id="sweep-quantiles-other" type="text" size="10" placeholder="e.g. 3"></label>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-block">
+            <label class="chk"><input id="sweep-untrained" type="checkbox"> <strong>Add an untrained control population</strong></label>
+            <p class="hint">Trains a second population with the <em>same seeds</em> for 0 epochs, so
+            each trained network is paired with its own initialisation. Without it there is nothing to
+            compare against, and a structure found in the trained weights cannot be shown to come from
+            training. Doubles the number of clouds.</p>
+          </div>
+
+          <p class="hint" id="sweep-count"></p>
+          <p class="hint">Being automatic is not the same as being right: an automatic rule
+          still has to pick a scale, and the wrong scale either fuses the cloud into one node
+          or shatters it into dust. Read <code>n_components</code> and <code>cpc_mean</code>
+          whichever option you choose.</p>
+          <p class="hint"><strong>first-gap</strong> needs no threshold: it cuts each cell's
+          dendrogram at the first decisive gap, so cells in dense and sparse regions get
+          different cuts. It is the classical Mapper rule. Pair it with single linkage to
+          follow thin, curve-like structure — the compact linkages (complete, average, ward)
+          tend to cut across such a structure rather than along it.</p>
+          <p class="hint">⚠️ <strong>eps at the k-NN elbow</strong> is the other automatic
+          option, but on curve-like data it tends to land at the noise scale rather than the
+          structure scale, which shatters the graph into many components. Prefer first-gap, or
+          sweep quantiles and look for the plateau where <code>b1</code> holds steady.</p>
+        </div>
+
+        <label class="chk hidden" id="interactive-wrap">
+          <input type="checkbox" id="interactive3d" /> Interactive 3-D graph (drag to rotate) — for Mapper
+        </label>
+      </article>
+    </section>
+
+    <!-- ============ CODE COLUMN ============ -->
+    <section class="code-col">
+      <div class="code-head">
+        <h2>Generated Python</h2>
+        <div class="code-actions">
+          <button id="copy-code" class="primary">Copy</button>
+          <button id="download-code" class="ghost">Download .py</button>
+          <button id="run-code" class="ghost" title="Requires the runner backend (web/server.py)">Run ▷</button>
+        </div>
+      </div>
+      <div class="runtime-bar">
+        <label class="inline">Run with kernel
+          <select id="kernel" disabled><option>start server to detect…</option></select>
+        </label>
+        <button id="refresh-kernels" class="ghost sm" title="Rescan environments">⟳</button>
+        <span id="kernel-note" class="hint"></span>
+      </div>
+      <div id="warnings" class="warnings"></div>
+      <pre class="code"><code id="code-out"></code></pre>
+      <div id="run-output" class="run-output hidden">
+        <div class="run-head"><span>Run output</span><button id="close-run" class="ghost sm">✕</button></div>
+        <div id="run-progress" class="run-progress hidden" role="progressbar" aria-label="training progress">
+          <div class="run-progress-track"><div id="run-progress-fill"></div></div>
+          <span id="run-progress-label"></span>
+        </div>
+        <pre id="run-log"></pre>
+        <div id="run-figs"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js?v=1787605029"></script>
+</body>
+</html>
