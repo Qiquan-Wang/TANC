@@ -18,6 +18,7 @@ some topological quantity along the training trajectory:
 from __future__ import annotations
 
 import math
+import warnings
 from dataclasses import dataclass, field
 from typing import Callable, Sequence, TYPE_CHECKING
 
@@ -49,6 +50,56 @@ def _epochs_of(view: TrainingView) -> np.ndarray:
         [s.epoch if s.epoch is not None else i for i, s in enumerate(view.snapshots)],
         dtype=float,
     )
+
+
+def _report_failures(failures: list[BaseException], total: int, what: str) -> None:
+    """Escalate per-epoch failures that were tolerated as NaN gaps.
+
+    The per-epoch ``except`` is deliberate: one bad snapshot out of twenty
+    should leave a gap, not abort the plot.  But it cannot tell one failure
+    from all of them, and an all-NaN series renders as empty axes with no clue
+    why.  So: every epoch failing is an error (raised with the original cause
+    attached), some failing is a warning that names the count and the first
+    message, and none failing is silent.
+    """
+    if not failures:
+        return
+    first = failures[0]
+    detail = f"{type(first).__name__}: {first}"
+    if len(failures) >= total:
+        raise RuntimeError(
+            f"Every epoch failed while computing {what} ({len(failures)}/{total}), "
+            f"so there is nothing to plot. First error \u2014 {detail}"
+        ) from first
+    warnings.warn(
+        f"{len(failures)}/{total} epochs failed while computing {what} and are "
+        f"plotted as gaps. First error \u2014 {detail}",
+        RuntimeWarning,
+        stacklevel=3,
+    )
+
+
+def _emit_progress(i: int, total: int, verbose: bool) -> None:
+    """Emit a machine-readable per-epoch marker on stdout.
+
+    Per-epoch persistent homology is silent for minutes at a time, which makes a
+    running job indistinguishable from a hung one.  The Visual Builder's run
+    panel parses ``__EPOCH__ i/n`` to drive its progress bar; elsewhere the
+    marker is merely a harmless log line.
+    """
+    if verbose:
+        print(f"__EPOCH__ {i}/{total}", flush=True)
+
+
+def _available_layers(view: TrainingView, source: str) -> list[str]:
+    """Layer names with recorded data for *source*, from the final snapshot."""
+    if source not in ("activations", "weights"):
+        raise ValueError(
+            f"source must be 'activations' or 'weights', got {source!r}."
+        )
+    snap = view.final_snapshot
+    recorded = snap.activations if source == "activations" else snap.weights
+    return sorted(recorded)
 
 
 def _smooth_series(x: np.ndarray, window: int = 5) -> np.ndarray:
@@ -210,6 +261,7 @@ def plot_id_over_training(
     source: str = "activations",
     orientation: str = "rows",
     mark_settle: bool = False,
+    verbose: bool = False,
     ax: Axes | None = None,
     figsize: tuple[float, float] | None = None,
     title: str | None = None,
@@ -246,16 +298,28 @@ def plot_id_over_training(
     if isinstance(methods, str):
         methods = (methods,)
 
+    available = _available_layers(view, source)
+    if layer not in available:
+        raise ValueError(
+            f"Layer {layer!r} has no recorded {source}. "
+            f"Recorded layers: {', '.join(available) if available else '(none)'}. "
+            f"{source.capitalize()} are captured only for the layers named by "
+            f"`layer_selection` when the TrainingView was extracted \u2014 widen it "
+            f"(for example layer_selection='linear_and_conv') and re-extract."
+        )
+
     epochs = _epochs_of(view)
     fig, ax = make_figure(ax, figsize, default_figsize=(7, 4))
 
+    _total = len(view.snapshots)
     for m in methods:
-        ids = np.array(
-            [_id_single_layer(s, layer, m, source=source, orientation=orientation,
-                              **method_kwargs)
-             for s in view.snapshots],
-            dtype=float,
-        )
+        _vals: list[float] = []
+        for _i, s in enumerate(view.snapshots, 1):
+            _emit_progress(_i, _total, verbose)
+            _vals.append(_id_single_layer(s, layer, m, source=source,
+                                          orientation=orientation,
+                                          **method_kwargs))
+        ids = np.array(_vals, dtype=float)
         ax.plot(epochs, ids, marker="o", markersize=3, label=f"{m} 2NN")
         if mark_settle:
             _mark_settle(ax, epochs, ids)
@@ -275,6 +339,7 @@ def plot_id_trajectory_all_layers(
     layout: str = "overlay",
     layers: list[str] | None = None,
     ncols: int = 2,
+    verbose: bool = False,
     figsize: tuple[float, float] | None = None,
     title: str | None = None,
     **method_kwargs,
@@ -301,11 +366,15 @@ def plot_id_trajectory_all_layers(
 
     epochs = _epochs_of(view)
     series: dict[str, np.ndarray] = {}
+    _total = len(view.snapshots) * len(layers)
+    _done = 0
     for name in layers:
-        series[name] = np.array(
-            [_id_single_layer(s, name, method, **method_kwargs) for s in view.snapshots],
-            dtype=float,
-        )
+        _vals: list[float] = []
+        for s in view.snapshots:
+            _done += 1
+            _emit_progress(_done, _total, verbose)
+            _vals.append(_id_single_layer(s, name, method, **method_kwargs))
+        series[name] = np.array(_vals, dtype=float)
 
     if layout == "overlay":
         fig, ax = make_figure(None, figsize, default_figsize=(7, 4))
@@ -527,6 +596,7 @@ def plot_ph_statistic_trajectory(
     normalize: bool = False,
     mark_settle: bool = False,
     sparse: bool = False,
+    verbose: bool = False,
     ax: Axes | None = None,
     figsize: tuple[float, float] | None = None,
     title: str | None = None,
@@ -565,13 +635,18 @@ def plot_ph_statistic_trajectory(
 
     epochs = _epochs_of(view)
     values: list[float] = []
-    for snap in view.snapshots:
+    _total = len(view.snapshots)
+    _failures: list[BaseException] = []
+    for _i, snap in enumerate(view.snapshots, 1):
+        _emit_progress(_i, _total, verbose)
         try:
             res = _snapshot_ph_result(snap, builder, layer, max_dim=max(dim, 1),
                                       normalize=normalize, sparse=sparse)
             values.append(float(res.statistics.get(f"H{dim}_{stat}", float("nan"))))
-        except Exception:
+        except Exception as _exc:
+            _failures.append(_exc)
             values.append(float("nan"))
+    _report_failures(_failures, _total, "the PH statistic over epochs")
 
     fig, ax = make_figure(ax, figsize, default_figsize=(7, 4))
     ax.plot(epochs, values, marker="o", markersize=3)
@@ -592,6 +667,7 @@ def plot_betti_trajectory(
     layer: str | None = None,
     builder: Callable[[ModelSnapshot], GraphBundle] | None = None,
     sparse: bool = False,
+    verbose: bool = False,
     ax: Axes | None = None,
     figsize: tuple[float, float] | None = None,
     title: str | None = None,
@@ -613,7 +689,10 @@ def plot_betti_trajectory(
 
     epochs = _epochs_of(view)
     counts: list[float] = []
-    for snap in view.snapshots:
+    _total = len(view.snapshots)
+    _failures: list[BaseException] = []
+    for _i, snap in enumerate(view.snapshots, 1):
+        _emit_progress(_i, _total, verbose)
         try:
             res = _snapshot_ph_result(snap, builder, layer, max_dim=max(dim, 1),
                                       sparse=sparse)
@@ -623,8 +702,10 @@ def plot_betti_trajectory(
                 continue
             eps = epsilon if epsilon is not None else float(np.median(dgm[:, 0]))
             counts.append(float(betti_number(dgm, eps)))
-        except Exception:
+        except Exception as _exc:
+            _failures.append(_exc)
             counts.append(float("nan"))
+    _report_failures(_failures, _total, "Betti numbers over epochs")
 
     fig, ax = make_figure(ax, figsize, default_figsize=(7, 4))
     ax.plot(epochs, counts, marker="o", markersize=3)
@@ -643,6 +724,7 @@ def plot_diagram_distance_matrix(
     layer: str | None = None,
     builder: Callable[[ModelSnapshot], GraphBundle] | None = None,
     sparse: bool = False,
+    verbose: bool = False,
     min_persistence: float = 0.0,
     cmap: str = "magma",
     figsize: tuple[float, float] | None = None,
@@ -678,14 +760,19 @@ def plot_diagram_distance_matrix(
 
     epochs = _epochs_of(view)
     diagrams: list[np.ndarray] = []
-    for snap in view.snapshots:
+    _total = len(view.snapshots)
+    _failures: list[BaseException] = []
+    for _i, snap in enumerate(view.snapshots, 1):
+        _emit_progress(_i, _total, verbose)
         try:
             res = _snapshot_ph_result(snap, builder, layer, max_dim=max(dim, 1),
                                       sparse=sparse)
             dgm = res.ph_result.diagrams.get(dim, np.empty((0, 2)))
             diagrams.append(_prune_persistence(dgm, min_persistence))
-        except Exception:
+        except Exception as _exc:
+            _failures.append(_exc)
             diagrams.append(np.empty((0, 2)))
+    _report_failures(_failures, _total, "the diagram distance matrix")
 
     T = len(diagrams)
     D = np.zeros((T, T))
@@ -719,6 +806,7 @@ def plot_ph_statistic_pairplot(
     layer: str | None = None,
     builder: Callable[[ModelSnapshot], GraphBundle] | None = None,
     sparse: bool = False,
+    verbose: bool = False,
     figsize: tuple[float, float] | None = None,
     title: str | None = None,
     cmap: str = "viridis",
@@ -747,16 +835,21 @@ def plot_ph_statistic_pairplot(
 
     epochs = _epochs_of(view)
     rows: list[list[float]] = []
-    for snap in view.snapshots:
+    _total = len(view.snapshots)
+    _failures: list[BaseException] = []
+    for _i, snap in enumerate(view.snapshots, 1):
+        _emit_progress(_i, _total, verbose)
         row: list[float] = []
         try:
             res = _snapshot_ph_result(snap, builder, layer, max_dim=max(dim, 1),
                                       sparse=sparse)
             for s in stats:
                 row.append(float(res.statistics.get(f"H{dim}_{s}", float("nan"))))
-        except Exception:
+        except Exception as _exc:
+            _failures.append(_exc)
             row = [float("nan")] * len(stats)
         rows.append(row)
+    _report_failures(_failures, _total, "the PH-statistic pairplot")
     M = np.array(rows)
 
     n = len(stats)
@@ -801,6 +894,7 @@ def plot_diagram_distance_trajectory(
     normalize: bool = False,
     mark_settle: bool = False,
     sparse: bool = False,
+    verbose: bool = False,
     min_persistence: float = 0.0,
     ax: Axes | None = None,
     figsize: tuple[float, float] | None = None,
@@ -847,14 +941,19 @@ def plot_diagram_distance_trajectory(
 
     epochs = _epochs_of(view)
     diagrams: list[np.ndarray] = []
-    for snap in view.snapshots:
+    _total = len(view.snapshots)
+    _failures: list[BaseException] = []
+    for _i, snap in enumerate(view.snapshots, 1):
+        _emit_progress(_i, _total, verbose)
         try:
             res = _snapshot_ph_result(snap, builder, layer, max_dim=max(dim, 1),
                                       normalize=normalize, sparse=sparse)
             dgm = res.ph_result.diagrams.get(dim, np.empty((0, 2)))
             diagrams.append(_prune_persistence(dgm, min_persistence))
-        except Exception:
+        except Exception as _exc:
+            _failures.append(_exc)
             diagrams.append(np.empty((0, 2)))
+    _report_failures(_failures, _total, "the diagram distance trajectory")
 
     if ref == "previous":
         distances = [float("nan")] + [
@@ -1155,6 +1254,7 @@ def plot_ph_statistics_panel(
     normalize: bool = False,
     mark_settle: bool = False,
     sparse: bool = False,
+    verbose: bool = False,
     ncols: int = 3,
     figsize: tuple[float, float] | None = None,
     title: str | None = None,
@@ -1180,14 +1280,19 @@ def plot_ph_statistics_panel(
 
     epochs = _epochs_of(view)
     rows = []
-    for snap in view.snapshots:
+    _total = len(view.snapshots)
+    _failures: list[BaseException] = []
+    for _i, snap in enumerate(view.snapshots, 1):
+        _emit_progress(_i, _total, verbose)
         try:
             res = _snapshot_ph_result(snap, builder, layer, max_dim=max(dim, 1),
                                       normalize=normalize, sparse=sparse)
             dgm = res.ph_result.diagrams.get(dim, np.empty((0, 2)))
             rows.append(diagram_statistics(dgm))
-        except Exception:
+        except Exception as _exc:
+            _failures.append(_exc)
             rows.append({k: float("nan") for k in DIAGRAM_STAT_LABELS})
+    _report_failures(_failures, _total, "the PH statistics panel")
 
     n = len(stats)
     nrows = int(np.ceil(n / ncols))
