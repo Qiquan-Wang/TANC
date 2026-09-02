@@ -7,7 +7,7 @@ name = "tanc"
 version = "0.1.0"
 description = "Topological Data Analysis for Neural Networks — a composable extraction → graph → topology → visualisation pipeline."
 readme = "README.md"
-requires-python = ">=3.9,<3.13"
+requires-python = ">=3.11,<3.13"
 # AGPL-3.0, not a permissive licence: giotto-tda (a required dependency) is
 # AGPLv3, so a combined work cannot be distributed under MIT terms.
 license = "AGPL-3.0-or-later"

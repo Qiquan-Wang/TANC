@@ -576,6 +576,7 @@ class TDAPipeline:
         self,
         data_dict: dict[str, Any],
         kind: str | None = None,
+        layer: int | None = None,
     ):
         """Run ``.fit()`` on each entry in data_dict and plot side-by-side.
 
@@ -585,16 +586,38 @@ class TDAPipeline:
             Keys become panel labels.  Values are passed to ``.fit()``.
         kind : str or None
             Visualisation kind; falls back to ``self.visualisation``.
+        layer : int or None
+            Which layer to compare when the analysis is per-layer (a
+            :class:`TopoResultSet` of more than one result).  Required in that
+            case, since each label must reduce to a single panel.
 
         Returns
         -------
         matplotlib Figure
         """
         from tanc.visualisation.representations import plot_diagram_comparison
-        from tanc.topo_tools._result import PersistenceResult
+        from tanc.topo_tools._result import PersistenceResult, TopoResultSet
 
         results = {label: self.fit(data) for label, data in data_dict.items()}
         k = kind or self.visualisation or "diagram"
+
+        # Per-layer analyses return one result per layer, so reduce each entry
+        # to the single result its panel will show.
+        reduced: dict[str, Any] = {}
+        for label, res in results.items():
+            if not isinstance(res, TopoResultSet):
+                reduced[label] = res
+            elif len(res) == 1:
+                reduced[label] = res[0]
+            elif layer is None:
+                raise ValueError(
+                    f"'{label}' produced {len(res)} per-layer results, so there is no "
+                    f"single panel to draw for it. Pass layer=<index> to compare one "
+                    f"layer (0-{len(res) - 1})."
+                )
+            else:
+                reduced[label] = res[layer]
+        results = reduced
 
         if k in {"diagram", "barcode", "betti_curve"}:
             # Extract PersistenceResult objects for comparison plot
@@ -612,7 +635,7 @@ class TDAPipeline:
         if n == 1:
             axes = [axes]
         for ax, (label, res) in zip(axes, results.items()):
-            res.plot(k)
+            res.plot(k, ax=ax, title=label)
         fig.tight_layout()
         return fig
 

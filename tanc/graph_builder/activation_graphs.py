@@ -159,6 +159,19 @@ def build_activation_graph(
             "drop_constant/node_sampling operate on neuron-nodes and are only "
             f"valid for distance='correlation', not '{distance}'."
         )
+    if distance == "correlation" and not drop_constant:
+        constant = np.flatnonzero(activations.var(axis=0) <= 1e-12)
+        if constant.size:
+            shown = constant[:8].tolist()
+            more = ", ..." if constant.size > 8 else ""
+            raise ValueError(
+                f"{constant.size} neuron(s) have zero variance (columns {shown}{more}). "
+                f"A correlation distance to a constant vector is undefined, so the "
+                f"matrix would fill with NaN and the filtration would be undefined. "
+                f"Pass drop_constant=True to discard them (Ballester et al. 2024), or "
+                f"use a distance that tolerates them, e.g. distance='euclidean'."
+            )
+
     selected_neurons: np.ndarray | None = None
     if distance == "correlation" and (drop_constant or node_sampling is not None):
         activations, selected_neurons = _select_neurons(

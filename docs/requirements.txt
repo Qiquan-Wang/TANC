@@ -6,7 +6,7 @@
 #
 #   python -m pip install -r requirements.txt
 #
-# Tested with Python 3.11.  (3.9-3.12 should all resolve.)
+# Tested with Python 3.11.  Requires 3.11 or 3.12.
 # =============================================================================
 
 # --- Scientific core (always required) ---------------------------------------

@@ -10,11 +10,6 @@ the parameters that are usually guessed, reports the **nerve of the cover**
 alongside every graph so the two can be compared, and flags the two ways a
 Mapper graph goes wrong.
 
-.. contents::
-   :local:
-   :depth: 2
-
-
 The one number to read first
 ----------------------------
 

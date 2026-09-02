@@ -70,7 +70,12 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
     "myst_nb",                      # MyST .md files + rendered .ipynb notebooks
+    "sphinx.ext.mathjax",           # renders the math dollarmath picks up
 ]
+
+# MyST does not parse $...$ unless dollarmath is enabled, so notebook markdown
+# cells were printing their LaTeX as literal source.
+myst_enable_extensions = ["dollarmath"]
 
 # Render notebooks from their stored outputs only — never execute during the
 # build (the docs env mocks torch/gudhi, and executing would train models).
