@@ -1,12 +1,12 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/Qiquan-Wang/TANC/main/assets/logo.png" alt="TANC logo — a tank whose treads trace a figure-eight" width="420" />
-</p>
+<img src="https://raw.githubusercontent.com/Qiquan-Wang/TANC/main/assets/logo.png" alt="TANC logo — a tank whose treads trace a figure-eight" align="left" width="200" />
 
-<h1 align="center">TANC</h1>
+# TANC
 
 **T**opological **A**nalysis of **N**eural networks through **C**omposition — a
 composable extraction → graph → topology → visualisation pipeline for studying
 trained networks with persistent homology, Mapper, and intrinsic dimension.
+
+<br clear="left" />
 
 Licensed under **AGPL-3.0-or-later** (see
 [LICENSE](https://github.com/Qiquan-Wang/TANC/blob/main/LICENSE)); the required
