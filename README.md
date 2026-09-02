@@ -25,7 +25,7 @@ pip install -e .
 ## The mental model — four choices
 
 The core idea is **mix and match**. A trained network has several *spaces* you can
-study; you pick one, pick how to turn it into a graph, pick a topological method, and
+study. You pick one, pick how to turn it into a graph, pick a topological method, and
 pick what to read off. Every analysis is a point along four axes:
 
 ```
