@@ -18,7 +18,7 @@ under permissive terms.
 ## Getting started
 
 A first-pass tour for new users. For deeper module-by-module references see
-the per-module `README.md` files.
+the per-module `README.md` files or visit the [TANC project page](https://qiquan-wang.github.io/TANC/).
 
 ## Install
 
