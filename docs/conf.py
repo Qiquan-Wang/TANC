@@ -110,11 +110,15 @@ autodoc_mock_imports = [
 html_theme = "furo"                 # sidebar nav, client-side search, dark mode
 html_static_path = ["_static"]
 html_title = "TANC"
+html_favicon = "_static/logo-icon.png"
 
 html_theme_options = {
     "source_repository": "https://github.com/Qiquan-Wang/TANC/",
     "source_branch": "main",
     "source_directory": "docs/",
+    # furo takes the sidebar logo per-theme rather than via html_logo
+    "light_logo": "logo.png",
+    "dark_logo": "logo.png",
 }
 
 # .rst is handled by Sphinx; myst_nb registers .md (MyST) and .ipynb (notebooks).
