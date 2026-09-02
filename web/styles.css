@@ -189,3 +189,9 @@ button.sm { padding: 3px 8px; font-size: 12px; }
   font-family: ui-monospace, Menlo, monospace; font-size: .75rem;
   white-space: nowrap; opacity: .75; font-variant-numeric: tabular-nums;
 }
+
+/* A warning the builder knows is fatal: the run would train, then fail. */
+.warn-error { color: #8a1c1c; background: #fdeaea; border-color: #f0c2c2; }
+:root[data-theme="dark"] .warn-error { color: #ff9d9d; background: #2c0f0f; border-color: #5a2020; }
+#stop-code { color: #8a1c1c; border-color: #f0c2c2; }
+:root[data-theme="dark"] #stop-code { color: #ff9d9d; border-color: #5a2020; }

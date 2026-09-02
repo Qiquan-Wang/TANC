@@ -379,7 +379,30 @@ function autoName(type) {
   while (used.has(pfx + n)) n++;
   return pfx + n;
 }
+// Warnings are plain strings; err() marks one as blocking, so the config is
+// known to fail and the Run button is disabled until it is resolved.
+function err(text) { return { level: "error", text }; }
+
 function recordableLayers() { return state.layers.filter(l => LAYERS[l.type].weights); }
+
+// Which layers the current "Record what" settings will actually capture.
+// Mirrors the layer_selection presets in model_extractor/_inspector.py, so the
+// builder can tell before running that a chosen layer will have no data.
+const SELECTION_TYPES = {
+  all_linear:      ["linear"],
+  all_conv:        ["conv2d"],
+  soro:            ["soro"],
+  all_attention:   ["transformer"],
+  all_embedding:   ["embedding"],
+  linear_and_conv: ["linear", "conv2d"],
+  all:             ["linear", "conv2d", "embedding", "soro", "transformer"],
+};
+function recordedLayerNames() {
+  if ($("#record-mode").value === "explicit")
+    return $$("#record-explicit input:checked").map(c => c.dataset.name);
+  const types = SELECTION_TYPES[$("#record-preset").value] || [];
+  return state.layers.filter(l => types.includes(l.type)).map(l => l.name);
+}
 function hasSoRO() { return state.layers.some(l => l.type === "soro"); }
 function hasSeq()  { return state.layers.some(l => LAYERS[l.type].seq); }
 
@@ -1068,6 +1091,21 @@ function generate() {
     if (conf.construction && v.cons === "activation cloud")
       warns.push("activation-cloud construction: make sure the chosen layer is in the recorded set (activations are captured only for recorded layers). "
         + "With many neurons/samples, per-epoch H1 + Wasserstein can be very slow — prefer dim 0, wide layers as neurons-points sparingly, or fewer epochs first.");
+      // The chosen layer must actually be recorded, or every epoch scores NaN
+      // and the plot comes back empty. Both sides are known here, so this is a
+      // blocking error rather than a hint: the run would train first, then fail.
+      const otLayer = v.layer || v.ac_layer || v.pc_layer || v.wg_layer;
+      if (otLayer && otLayer !== "__all__") {
+        const recNames = recordedLayerNames();
+        if (!recNames.includes(otLayer)) {
+          const how = $("#record-mode").value === "explicit"
+            ? `tick \u201c${otLayer}\u201d`
+            : `switch the group from \u201c${$("#record-preset").value}\u201d to one that includes it `
+              + `(it currently records: ${recNames.join(", ") || "nothing"})`;
+          warns.push(err(`Layer \u201c${otLayer}\u201d is not in the recorded set, so it will have `
+            + `no data and the plot will come back empty. Under \u201cRecord what\u201d, ${how}.`));
+        }
+      }
   } else if (state.analysisMode === "preset") {
     const p = PRESETS.find(x => x.k === $("#preset").value);
     presetKey = p.k; traj = !!p.traj; rep = p.rep || null; needsLoss = !!p.loss;
@@ -1553,7 +1591,8 @@ function generate() {
       // per-epoch PH → trajectory plot (a visualisation function, not a pipeline)
       L.push(`# ── Persistent homology per epoch → trajectory plot ───────────────`);
       otPre.forEach(x => L.push(x));
-      L.push(`fig = ${otFn}(${otArgs})`);
+      L.push(`print("computing per-epoch topology for ${epochs} snapshots \u2014 this is the slow part", flush=True)`);
+      L.push(`fig = ${otFn}(${otArgs}, verbose=True)`);
       L.push(`fig.savefig("tda_result_0.png", bbox_inches="tight")`);
       L.push(`print("saved figure -> tda_result_0.png")`);
       return { code: L.join("\n"), warns };
@@ -1595,7 +1634,18 @@ function regen() {
   _code = code;
   $("#code-out").innerHTML = highlight(code);
   const wbox = $("#warnings"); wbox.innerHTML = "";
-  warns.forEach(w => { const d = el("div", "warn", w); wbox.appendChild(d); });
+  let blocking = 0;
+  warns.forEach(w => {
+    const isErr = w && typeof w === "object" && w.level === "error";
+    if (isErr) blocking++;
+    wbox.appendChild(el("div", isErr ? "warn warn-error" : "warn", isErr ? w.text : w));
+  });
+  // A config we already know will fail should be unclickable, not merely noted.
+  const runBtn = $("#run-code");
+  runBtn.disabled = blocking > 0;
+  runBtn.title = blocking
+    ? "Fix the highlighted error first"
+    : "Requires the runner backend (web/server.py)";
   $("#interactive-wrap").classList.toggle("hidden", !analysisNeedsMapper());   // 3-D toggle: Mapper only
   updateKernelNote();          // Mapper/gtda hint depends on the chosen analysis
 }
@@ -1667,6 +1717,7 @@ function wire() {
     URL.revokeObjectURL(a.href);
   };
   $("#run-code").onclick = runCode;
+  $("#stop-code").onclick = stopRun;
   $("#close-run").onclick = () => $("#run-output").classList.add("hidden");
   $("#refresh-kernels").onclick = loadKernels;
 
@@ -1778,7 +1829,32 @@ function updateKernelNote() {
   $("#kernel-note").textContent = msg;
 }
 
+// One run at a time. The server already kills the child when the response
+// stream breaks, so aborting this controller terminates the Python process;
+// without it a second Run would leave the first training in the background.
+let _run = null;
+
+function setRunning(on) {
+  $("#run-code").classList.toggle("hidden", on);
+  $("#stop-code").classList.toggle("hidden", !on);
+}
+
+function stopRun() {
+  if (!_run) return;
+  _run.abort();
+  _run = null;
+  setRunning(false);
+  $("#run-log").textContent += "\n\n\u2014 terminated by user \u2014";
+  $("#run-progress").classList.add("hidden");
+}
+
 async function runCode() {
+  if (_run) {                       // guard: never two children at once
+    $("#run-log").textContent = "A run is already in progress. Press Terminate \u25a0 first.";
+    return;
+  }
+  _run = new AbortController();
+  setRunning(true);
   const out = $("#run-output"); out.classList.remove("hidden");
   const log = $("#run-log"); log.textContent = "Starting…";
   $("#run-figs").innerHTML = "";
@@ -1812,7 +1888,7 @@ async function runCode() {
   };
 
   try {
-    const resp = await fetch("/run", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ code:_code, python }) });
+    const resp = await fetch("/run", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ code:_code, python }), signal: _run.signal });
     if (!resp.ok || !resp.body) throw new Error("HTTP " + resp.status);
     const reader = resp.body.getReader(); const dec = new TextDecoder();
     let buf = "";
@@ -1849,7 +1925,11 @@ async function runCode() {
       });
     }
   } catch (e) {
-    log.textContent = "Could not reach the runner backend.\nStart it with:  python web/server.py\n\n(" + e.message + ")";
+    if (e.name !== "AbortError")     // an abort is a deliberate stop, not a fault
+      log.textContent = "Could not reach the runner backend.\nStart it with:  python web/server.py\n\n(" + e.message + ")";
+  } finally {
+    _run = null;
+    setRunning(false);
   }
 }
 
