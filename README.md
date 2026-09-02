@@ -1,6 +1,6 @@
 <img src="https://raw.githubusercontent.com/Qiquan-Wang/TANC/main/assets/logo.png" alt="TANC logo — a tank whose treads trace a figure-eight" align="left" width="200" />
 
-# TANC
+### TANC
 
 **T**opological **A**nalysis of **N**eural networks through **C**omposition — a
 composable extraction → graph → topology → visualisation pipeline for studying
