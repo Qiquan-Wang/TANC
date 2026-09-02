@@ -4,7 +4,7 @@
 
 **T**opological **A**nalysis of **N**eural networks through **C**omposition — a
 composable extraction → graph → topology → visualisation pipeline for studying
-trained networks with persistent homology, Mapper, and intrinsic dimension.
+trained networks with persistent homology, Mapper, and intrinsic dimension and more.
 
 <br clear="left" />
 
