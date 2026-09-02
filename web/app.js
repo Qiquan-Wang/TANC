@@ -383,6 +383,27 @@ function autoName(type) {
 // known to fail and the Run button is disabled until it is resolved.
 function err(text) { return { level: "error", text }; }
 
+// The sweep panel's conceptual notes are reference material, not form guidance,
+// and there are twelve of them. Collapsing them is remembered per browser;
+// constraints, the eps warning and the dynamic hints are never hidden.
+const SWEEP_EXPLAIN_KEY = "tanc.sweepExplain";
+function applySweepExplain() {
+  const box = $("#sweep-explain");
+  if (!box) return;
+  $("#analysis-sweep").classList.toggle("no-explain", !box.checked);
+  try { localStorage.setItem(SWEEP_EXPLAIN_KEY, box.checked ? "1" : "0"); } catch (e) { /* private mode */ }
+}
+function initSweepExplain() {
+  const box = $("#sweep-explain");
+  if (!box) return;
+  try {
+    const saved = localStorage.getItem(SWEEP_EXPLAIN_KEY);
+    if (saved !== null) box.checked = saved === "1";
+  } catch (e) { /* private mode: keep the default */ }
+  box.onchange = applySweepExplain;
+  applySweepExplain();
+}
+
 function recordableLayers() { return state.layers.filter(l => LAYERS[l.type].weights); }
 
 // Which layers the current "Record what" settings will actually capture.
@@ -1730,6 +1751,7 @@ function wire() {
   $("#reset-all").onclick = () => { state.layers = []; renderAll(); regen(); };
   $("#load-example").onclick = loadExample;
 
+  initSweepExplain();
   loadExample();   // start with something meaningful
   loadKernels();   // detect Python environments (if the runner backend is up)
 }

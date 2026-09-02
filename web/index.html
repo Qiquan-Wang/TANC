@@ -220,14 +220,15 @@
 
         <!-- mapper sweep -->
         <div id="analysis-sweep" class="hidden">
-          <p class="hint">Trains a population of networks, then runs Mapper across a grid of
+          <label class="explain-toggle" title="Hide the conceptual notes; constraints and warnings stay"><input type="checkbox" id="sweep-explain" checked> Explain</label>
+          <p class="hint explain">Trains a population of networks, then runs Mapper across a grid of
           cover and clustering parameters. Every graph is reported alongside the
           <em>nerve of its own cover</em>, so <code>b1_excess</code> separates a real
           finding from an artefact of the cover.</p>
 
           <label>Layer(s) to analyse — from the model you built above</label>
           <div id="sweep-layers" class="chips"></div>
-          <p class="hint">Each layer × view pair becomes its own point cloud, so the grid
+          <p class="hint explain">Each layer × view pair becomes its own point cloud, so the grid
           grows multiplicatively.</p>
 
           <label>View(s) — what counts as <strong>one point</strong></label>
@@ -243,7 +244,7 @@
             <label class="chk"><input type="checkbox" data-v="gram_cols"> gram_cols</label>
             <label class="chk"><input type="checkbox" data-v="gram_diag"> gram_diag <span class="ltype">lag profile</span></label>
           </div>
-          <p class="hint">On a <strong>2-D</strong> weight — a linear layer, an embedding table,
+          <p class="hint explain">On a <strong>2-D</strong> weight — a linear layer, an embedding table,
           an attention projection — these read the matrix directly.</p>
 
           <label>Convolutional views — for a <code>(out, in, h, w)</code> weight</label>
@@ -255,7 +256,7 @@
             <label class="chk"><input type="checkbox" data-v="in_channel"> in_channel</label>
             <label class="chk"><input type="checkbox" data-v="tap"> tap <span class="ltype">one spatial position</span></label>
           </div>
-          <p class="hint">A convolutional weight has four axes, so &ldquo;row&rdquo; names no
+          <p class="hint explain">A convolutional weight has four axes, so &ldquo;row&rdquo; names no
           particular one. Each view here says <strong>which axes index points</strong>; the rest
           become that point&rsquo;s coordinates. <code>rows</code> and <code>cols</code> are the rows
           and columns <em>of the kernel itself</em>. A Conv1d kernel has <code>h = 1</code>, so
@@ -270,7 +271,7 @@
             <label class="chk"><input type="checkbox" data-v="tsne2"> tsne2 <span class="ltype">slow</span></label>
             <label class="chk"><input type="checkbox" data-v="umap2"> umap2 <span class="ltype">needs umap-learn</span></label>
           </div>
-          <p class="hint">A 1-D lens gives an interval-chain cover whose nerve has
+          <p class="hint explain">A 1-D lens gives an interval-chain cover whose nerve has
           <code>b1 = 0</code>, so there <code>b1_excess = b1</code> exactly — do not compare
           <code>b1_excess</code> across lenses of different dimension.</p>
 
@@ -283,9 +284,9 @@
                 <label class="chk"><input type="checkbox" data-v="mean_centre"> mean centre</label>
                 <label class="chk"><input type="checkbox" data-v="standardise"> standardise</label>
               </div>
-              <p class="hint">Applied before the lens, because it changes the distances the
+              <p class="hint explain">Applied before the lens, because it changes the distances the
               clusterer sees. <code>preprocess=</code> in the toolkit.</p>
-              <p class="hint"><strong>l2 normalise</strong> puts every point on the unit sphere, so
+              <p class="hint explain"><strong>l2 normalise</strong> puts every point on the unit sphere, so
               the clusterer sees direction rather than magnitude — use it when the structure you are
               after is in the <em>shape</em> of a point and not its <em>size</em>. One caveat: points
               with zero norm cannot be placed on the sphere and stay at the origin, where they are
@@ -304,7 +305,7 @@
                 <input id="sweep-filter-strength" type="text" value="1.0, 0.5, 0.3">
               </label>
               <p class="hint" id="sweep-filter-hint"></p>
-              <p class="hint">Applied <em>after</em> the lens, with the cover pinned to the
+              <p class="hint explain">Applied <em>after</em> the lens, with the cover pinned to the
               unfiltered lens range — otherwise removing points shrinks the cover with them
               and the comparison measures nothing. <code>point_filter=</code> in the toolkit.</p>
             </div>
@@ -334,7 +335,7 @@
             <label class="chk"><input type="checkbox" data-v="0.67"> 0.67</label>
             <label class="chk">other: <input id="sweep-overlap-other" type="text" size="12" placeholder="e.g. 0.45"></label>
           </div>
-          <p class="hint">Overlap is |I ∩ I&#39;| / |I| — the fraction of a cover interval shared
+          <p class="hint explain">Overlap is |I ∩ I&#39;| / |I| — the fraction of a cover interval shared
           with its neighbour. Interval width diverges as it approaches 1, so 1 is excluded.</p>
 
           <div class="grid2">
@@ -379,18 +380,18 @@
 
           <div class="control-block">
             <label class="chk"><input id="sweep-untrained" type="checkbox"> <strong>Add an untrained control population</strong></label>
-            <p class="hint">Trains a second population with the <em>same seeds</em> for 0 epochs, so
+            <p class="hint explain">Trains a second population with the <em>same seeds</em> for 0 epochs, so
             each trained network is paired with its own initialisation. Without it there is nothing to
             compare against, and a structure found in the trained weights cannot be shown to come from
             training. Doubles the number of clouds.</p>
           </div>
 
           <p class="hint" id="sweep-count"></p>
-          <p class="hint">Being automatic is not the same as being right: an automatic rule
+          <p class="hint explain">Being automatic is not the same as being right: an automatic rule
           still has to pick a scale, and the wrong scale either fuses the cloud into one node
           or shatters it into dust. Read <code>n_components</code> and <code>cpc_mean</code>
           whichever option you choose.</p>
-          <p class="hint"><strong>first-gap</strong> needs no threshold: it cuts each cell's
+          <p class="hint explain"><strong>first-gap</strong> needs no threshold: it cuts each cell's
           dendrogram at the first decisive gap, so cells in dense and sparse regions get
           different cuts. It is the classical Mapper rule. Pair it with single linkage to
           follow thin, curve-like structure — the compact linkages (complete, average, ward)
